@@ -7,6 +7,8 @@ function App() {
     const [selectedStrategy, setSelectedStrategy] = useState(null)
     const [strategyTrades, setStrategyTrades] = useState([])
     const [view, setView] = useState('dashboard') // 'dashboard' or 'detail'
+    const [btcPrediction, setBtcPrediction] = useState(null)
+    const [loadingBtc, setLoadingBtc] = useState(false)
     const wsRef = useRef(null)
 
     // 获取策略列表
@@ -95,6 +97,21 @@ function App() {
         setSelectedStrategy(null)
         setStrategyTrades([])
     }
+    // 获取 BTC 15m 预测
+    const fetchBtcPrediction = async () => {
+        setLoadingBtc(true)
+        try {
+            const res = await fetch('/api/predict/btc')
+            if (res.ok) {
+                const data = await res.json()
+                setBtcPrediction(data)
+            }
+        } catch (err) {
+            console.error('Failed to fetch BTC prediction:', err)
+        } finally {
+            setLoadingBtc(false)
+        }
+    }
 
     // WebSocket 连接
     useEffect(() => {
@@ -120,9 +137,11 @@ function App() {
     useEffect(() => {
         fetchStrategies()
         fetchTrades()
+        fetchBtcPrediction()
         const interval = setInterval(() => {
             fetchStrategies()
             fetchTrades()
+            fetchBtcPrediction()
         }, 30000)
         return () => clearInterval(interval)
     }, [])
@@ -315,6 +334,66 @@ function App() {
                     </div>
                     <div className="stat-label">总盈亏</div>
                 </div>
+            </div>
+
+            {/* BTC 15m 高精准预测模块 */}
+            <div className="card" style={{ marginBottom: '24px', background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)', border: '1px solid #333' }}>
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <div className="card-title" style={{ color: '#f7931a', fontSize: '1.2rem' }}>₿ BTC 15m Phase 4 高精准预测</div>
+                        <div className="card-subtitle">基于 L2 代理特征与 Meta-Labeling 过滤</div>
+                    </div>
+                    <button 
+                        className="btn btn-secondary btn-sm" 
+                        onClick={fetchBtcPrediction} 
+                        disabled={loadingBtc}
+                        style={{ background: '#333', borderColor: '#444' }}
+                    >
+                        {loadingBtc ? '计算中...' : '🔄 立即刷新'}
+                    </button>
+                </div>
+                
+                {btcPrediction ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', padding: '16px' }}>
+                        <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #444' }}>
+                            <div className="stat-label">最新预测时间</div>
+                            <div className="stat-value" style={{ fontSize: '1.1rem', marginTop: '8px' }}>{btcPrediction.datetime.split(' ')[1]}</div>
+                            <div className="stat-label" style={{ fontSize: '0.8rem', opacity: 0.6 }}>{btcPrediction.datetime.split(' ')[0]}</div>
+                        </div>
+                        <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #444' }}>
+                            <div className="stat-label">当前市场价格</div>
+                            <div className="stat-value" style={{ fontSize: '1.5rem', marginTop: '8px', color: '#f7931a' }}>
+                                ${btcPrediction.price?.toLocaleString()}
+                            </div>
+                        </div>
+                        <div className="stat-card" style={{ 
+                            background: btcPrediction.score > 0.6 ? 'rgba(38, 166, 154, 0.1)' : 'rgba(255,255,255,0.03)', 
+                            border: btcPrediction.score > 0.6 ? '1px solid #26a69a' : '1px solid #444',
+                            boxShadow: btcPrediction.score > 0.6 ? '0 0 15px rgba(38, 166, 154, 0.2)' : 'none'
+                        }}>
+                            <div className="stat-label">信号状态</div>
+                            <div className="stat-value" style={{ 
+                                fontSize: '1.2rem', 
+                                marginTop: '8px',
+                                color: btcPrediction.score > 0.6 ? '#26a69a' : (btcPrediction.score < 0.35 ? '#ef5350' : '#fff')
+                            }}>
+                                {btcPrediction.score > 0.6 ? '🚀 强烈看涨' : btcPrediction.signal}
+                            </div>
+                            {btcPrediction.score > 0.6 && <div style={{ fontSize: '0.7rem', color: '#26a69a', marginTop: '4px' }}>🔥 触发 Phase 4 高置信度阈值</div>}
+                        </div>
+                        <div className="stat-card" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #444' }}>
+                            <div className="stat-label">模型分值 (Score)</div>
+                            <div className="stat-value" style={{ fontSize: '1.5rem', marginTop: '8px' }}>{btcPrediction.score.toFixed(4)}</div>
+                            <div className="stat-label" style={{ fontSize: '0.7rem', marginTop: '4px' }}>
+                                Target: Next 15m Alpha
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        正在拉取最新 BTC 15m 预测数据...
+                    </div>
+                )}
             </div>
 
             {/* 策略卡片网格 */}

@@ -17,6 +17,18 @@ from database import init_db, add_trade, get_trades, add_equity_point, get_equit
 from database import update_strategy_status, get_strategy_status, get_stats, close_latest_trade
 from process_manager import ProcessManager
 
+import sys
+import os
+
+# 配置 BTC 策略引擎路径
+BTC_STRATEGY_PATH = "/Users/zhangzc/7/20260123/0208_Polymarket_BTC_15m"
+if BTC_STRATEGY_PATH not in sys.path:
+    sys.path.append(BTC_STRATEGY_PATH)
+
+from live_polymarket_qlib import LiveModel
+# 全局缓存模型实例
+btc_model = LiveModel(model_path=os.path.join(BTC_STRATEGY_PATH, "lgbm_btc_15m_final.pkl"))
+
 # 初始化
 app = FastAPI(title="AI Strategy Dashboard", version="1.0.0")
 
@@ -213,6 +225,22 @@ async def get_equity(strategy_id: str, hours: int = 24):
     """获取收益曲线数据"""
     curve = get_equity_curve(strategy_id, hours)
     return curve
+
+# ───────────────────────────────────────────────────────────────────────────────
+# BTC 15m 实时预测
+# ───────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/predict/btc")
+async def predict_btc():
+    """获取 BTC 15m 实时预测结果"""
+    try:
+        # 在后端线程池中运行（防止阻塞 FastAPI 事件循环）
+        result = await asyncio.to_thread(btc_model.predict_next_dict)
+        if not result:
+            raise HTTPException(status_code=500, detail="BTC Prediction failed")
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ───────────────────────────────────────────────────────────────────────────────
 # WebSocket
