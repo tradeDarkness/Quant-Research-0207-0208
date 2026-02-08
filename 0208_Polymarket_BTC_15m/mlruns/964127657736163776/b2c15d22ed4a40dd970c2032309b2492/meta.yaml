@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/zhangzc/7/20260123/0208_Polymarket_BTC_15m/mlruns/964127657736163776/b2c15d22ed4a40dd970c2032309b2492/artifacts
+end_time: 1770536293722
+entry_point_name: ''
+experiment_id: '964127657736163776'
+lifecycle_stage: active
+run_id: b2c15d22ed4a40dd970c2032309b2492
+run_name: mlflow_recorder
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1770536293649
+status: 3
+tags: []
+user_id: zhangzc

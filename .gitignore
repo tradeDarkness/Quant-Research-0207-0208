@@ -4,21 +4,22 @@
 __pycache__/
 *.pyc
 
-# Environments
+# Environments - MUST EXCLUDE to avoid 400MB+ timeout
 .venv*/
 venv/
 env/
 .env
 
-# Large Data & Binary
+# Large Data & Binary (allow in specific folders)
 *.h5
 *.bin
-*.pkl
 qlib_data/
 mlruns/
-*.csv
-!trade_history*.csv
-!*result*.csv
 
 # Dependencies
 node_modules/
+
+# === Whitelist for 0208_Polymarket_BTC_15m ===
+# Allow ALL files in this folder EXCEPT venv
+!0208_Polymarket_BTC_15m/**
+0208_Polymarket_BTC_15m/.venv_rdagent/
