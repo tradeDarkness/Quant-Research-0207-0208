@@ -152,7 +152,8 @@ class LiveModel:
         
         print(f"Preparing dataset for segment: {start_dt_str} to {last_dt_str}")
          # ═══════════════════════════════════════════════════════════════════════════════
-        # RD-Agent Gen-10 Factor Definition (Ported from ETH Strategy)
+        # ═══════════════════════════════════════════════════════════════════════════════
+        # RD-Agent Optimized Factor Set (Gen-1 to Gen-10)
         # ═══════════════════════════════════════════════════════════════════════════════
         fields = []
         names = []
@@ -182,6 +183,16 @@ class LiveModel:
         fields.append("($close / Ref($close, 5) - 1) / (Std($close, 5) / Mean($close, 5) + 1e-9)"); names.append("H5_MQuality")
         fields.append("($close / Mean($close, 20) - 1) * ($close / Ref($close, 1) - 1)"); names.append("H6_Slope")
 
+        # 8. RD-Agent Gen-3 Hypotheses
+        fields.append("($close / Ref($close, 5) - 1) / ($close / Ref($close, 20) - 1 + 1e-9)"); names.append("H7_TAccel")
+        fields.append("Std($close, 10) / (Std($close, 60) + 1e-9)"); names.append("H8_VSqueeze")
+        fields.append("($close / Ref($close, 1) - 1) * ($volume / Mean($volume, 20) + 1e-9)"); names.append("H9_VMom")
+
+        # 9. RD-Agent Gen-4 Hypotheses
+        fields.append("($close / Ref($close, 1) - 1) * ($volume / Mean($volume, 10))"); names.append("H10_PVInt")
+        fields.append("($close - Min($low, 20)) / (Max($high, 20) - Min($low, 20) + 1e-9)"); names.append("H11_KDJK")
+        fields.append("Mean($close / Ref($close, 1) > 1, 20)"); names.append("H12_UpStreak")
+
         # 10. RD-Agent Gen-6 Hypotheses
         fields.append("$close / Max($high, 20) - 1"); names.append("H13_HBreak")
         fields.append("$close / Min($low, 20) - 1"); names.append("H14_LBreak")
@@ -190,6 +201,13 @@ class LiveModel:
         # 11. RD-Agent Gen-7
         fields.append("Abs($close / Ref($close, 1) - 1)"); names.append("H16_ExtRet")
         fields.append("($volume / Mean($volume, 10)) / (Abs($close / Ref($close, 1) - 1) + 1e-9)"); names.append("H17_VPDiv")
+
+        # 12. RD-Agent Gen-10 Hypotheses
+        fields.append("($close / Ref($close, 3) - 1) + ($close / Ref($close, 5) - 1) + ($close / Ref($close, 10) - 1)"); names.append("H19_MomFusion")
+        fields.append("($high - $low) / (Min($high - $low, 20) + 1e-9)"); names.append("H20_VolExplo")
+        fields.append("($close - Mean($close, 20)) / (Std($close, 20) + 1e-9)"); names.append("H21_BBBreak")
+        fields.append("$volume / Ref($volume, 1) - 1"); names.append("H22_VolMomAcc")
+        fields.append("($close - Ref($close, 3)) / 3"); names.append("H23_PriceVel")
 
         # DataHandler Config
         dh_config = {
