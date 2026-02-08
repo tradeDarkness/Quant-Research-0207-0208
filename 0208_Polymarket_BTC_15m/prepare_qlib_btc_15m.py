@@ -4,7 +4,7 @@ import numpy as np
 import os
 from pathlib import Path
 
-def convert_to_qlib_format(input_file="BTCUSDT_15m.csv", qlib_dir="~/.qlib/qlib_data/my_crypto"):
+def convert_to_qlib_format(input_file="BTCUSDT_15m_tb.csv", qlib_dir="~/.qlib/qlib_data/my_crypto"):
     # Expand user path
     qlib_dir = os.path.expanduser(qlib_dir)
     os.makedirs(qlib_dir, exist_ok=True)
@@ -29,7 +29,7 @@ def convert_to_qlib_format(input_file="BTCUSDT_15m.csv", qlib_dir="~/.qlib/qlib_
     # Columns: symbol, date, open, high, low, close, volume, amount, factor
     
     # 1. Prepare DF
-    df['symbol'] = "BTCUSDT"
+    df['symbol'] = "btcusdt"
     df['date'] = df['datetime'] # Qlib handles datetime for high-freq?
     # For 15m data, date should include time?
     # Qlib format for high freq usually needs specific timestamp format.
@@ -80,7 +80,7 @@ def convert_to_qlib_format(input_file="BTCUSDT_15m.csv", qlib_dir="~/.qlib/qlib_
     import struct
     import shutil
     
-    # 1. Calendars
+    # 2. Calendars
     calendar_path = Path(qlib_dir) / "calendars"
     calendar_path.mkdir(parents=True, exist_ok=True)
     
@@ -91,67 +91,60 @@ def convert_to_qlib_format(input_file="BTCUSDT_15m.csv", qlib_dir="~/.qlib/qlib_
         for d in dates:
             f.write(f"{d}\n")
             
-    # Copy to day.txt to satisfy default checks if any
-    shutil.copy(calendar_path / "15min.txt", calendar_path / "day.txt")
+    # day.txt MUST only contain unique date strings (YYYY-MM-DD)
+    unique_days = sorted(df['date'].dt.strftime('%Y-%m-%d').unique())
+    with open(calendar_path / "day.txt", "w") as f:
+        for d in unique_days:
+            f.write(f"{d}\n")
             
     print(f"Saved calendar with {len(dates)} steps (15min & day).")
 
+    # 3. Features
+    # Naming convention: Qlib usually stores in <qlib_dir>/features/<symbol>/<field>.bin
+    # For high freq, it may look for <qlib_dir>/features/<freq>/<symbol>/<field>.bin
     # 2. Features
-    features_path = Path(qlib_dir) / "features" / "BTCUSDT"
-    features_path.mkdir(parents=True, exist_ok=True)
+    # Naming convention for high freq in Qlib: 
+    # <qlib_dir>/features/<freq>/<symbol_lower>/<field>.bin
+    # Note: Some Qlib versions are sensitive to symbol casing in the folder name.
+    symbol_lower = "btcusdt"
+    features_path_main = Path(qlib_dir) / "features" / symbol_lower
+    features_path_15min = Path(qlib_dir) / "features" / "15min" / symbol_lower
     
-    fields = ['open', 'close', 'high', 'low', 'volume', 'amount', 'factor']
+    for p in [features_path_main, features_path_15min]:
+        if p.exists(): shutil.rmtree(p)
+        p.mkdir(parents=True, exist_ok=True)
     
-    # Create date map for all trading days? 
-    # Qlib assumes continuous data usually aligned with calendar.
-    # Our data is continuous from Binance.
-    # If there are gaps, Qlib needs NaNs.
-    # Let's assume dates match df exactly for now. 
-    # Real Qlib uses a global calendar and maps index.
-    
-    # For simplification, we just dump what we have.
-    # But Qlib's data loader relies on calendar file.
-    # If df matches calendar 1:1, we are good.
+    fields = ['open', 'close', 'high', 'low', 'volume', 'amount', 'factor', 'lb_tb']
     
     for field in fields:
         # Convert to float32
         data = df[field].astype(np.float32).values
-        
-        # Prepend start_index=0 (as float32) for Qlib header
-        # Qlib expects [start_index, data...]
         data_with_header = np.hstack([[0.0], data]).astype("<f")
         
-        # Save as 15min.bin (Required for freq='15min')
-        bin_path_15m = features_path / f"{field.lower()}.15min.bin"
-        with open(bin_path_15m, "wb") as f:
-            data_with_header.tofile(f)
-            
-        # Save as day.bin (Fallback)
-        bin_path_day = features_path / f"{field.lower()}.day.bin"
-        with open(bin_path_day, "wb") as f:
-            data_with_header.tofile(f)
-            
-        # Also save as .bin for safety if Qlib defaults?
-        bin_path_default = features_path / f"{field.lower()}.bin"
-        with open(bin_path_default, "wb") as f:
-            data_with_header.tofile(f)
-            
-    print(f"Saved binary features for BTCUSDT.")
+        # Save to both paths
+        for p in [features_path_main, features_path_15min]:
+            bin_path = p / f"{field.lower()}.bin"
+            with open(bin_path, "wb") as f:
+                data_with_header.tofile(f)
+                    
+    print(f"Saved binary features for btcusdt (lowercased) in root and 15min folders.")
     
-    # 3. Instruments
+    # 4. Instruments
     instruments_path = Path(qlib_dir) / "instruments"
     instruments_path.mkdir(parents=True, exist_ok=True)
     
     real_start = dates[0].split()[0]
     real_end = dates[-1].split()[0]
     
-    # Fudge start date to ensure coverage
-    start_date = "2024-01-01" 
+    # Use actual data range for instrument file
+    start_date = real_start
     end_date = real_end
     
     with open(instruments_path / "all.txt", "w") as f:
-        f.write(f"BTCUSDT\t{start_date}\t{end_date}\n")
+        # Extend bounds for safety
+        f.write(f"{symbol_lower}\t2023-01-01\t2026-12-31\n")
         
+    print(f"Qlib data conversion successful for {symbol_lower}!")
     print("Saved instruments file.")
     print("Qlib data conversion successful (Manual Mode)!")
     
