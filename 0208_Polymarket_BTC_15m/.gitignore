@@ -1,0 +1,30 @@
+# Environment variables
+.env
+
+# Python virtual environment
+.venv_rdagent/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+log/
+rdagent.log
+conda_mock.log
+selector.log
+
+# Data
+data/
+*.h5
+*.bin
+*.pkl
+qlib_data/
+
+# MacOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

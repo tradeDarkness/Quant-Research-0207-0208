@@ -1,0 +1,94 @@
+{
+    "strategies": [
+        {
+            "id": "gen10_15171x",
+            "name": "Gen-10 EPIC (15171x)",
+            "path": "/Users/zhangzc/7/20260123/0208_Gen10_15171x_EPIC/live_inference.py",
+            "threshold": 0.0,
+            "color": "#F59E0B",
+            "description": "Gen-10 极限因子，零阈值，15171 倍回测收益",
+            "backtest_return": 1517140.31,
+            "win_rate": 57.15
+        },
+        {
+            "id": "gen7_117x",
+            "name": "Gen-7 (117x)",
+            "path": "/Users/zhangzc/7/20260123/0208_Gen7_T0001_117x/live_inference.py",
+            "threshold": 0.0001,
+            "color": "#10B981",
+            "description": "Gen-7 因子，阈值 0.0001，117 倍回测收益",
+            "backtest_return": 11755.42,
+            "win_rate": 57.88
+        },
+        {
+            "id": "gen7_3791pct",
+            "name": "Gen-7 (3791%)",
+            "path": "/Users/zhangzc/7/20260123/0208_Gen7_T0005_3791pct/live_inference.py",
+            "threshold": 0.0005,
+            "color": "#3B82F6",
+            "description": "Gen-7 因子，阈值 0.0005，3791% 回测收益",
+            "backtest_return": 3791.0,
+            "win_rate": 60.5
+        },
+        {
+            "id": "gen7_1195pct",
+            "name": "Gen-7 (1195%)",
+            "path": "/Users/zhangzc/7/20260123/0208_Gen7_1195pct/live_inference.py",
+            "threshold": 0.001,
+            "color": "#8B5CF6",
+            "description": "Gen-7 因子，阈值 0.001，1195% 回测收益",
+            "backtest_return": 1195.0,
+            "win_rate": 67.55
+        },
+        {
+            "id": "gen10_200x",
+            "name": "Gen-10 (200x Target)",
+            "path": "/Users/zhangzc/7/20260123/0208_Gen10_200x_target/live_inference.py",
+            "threshold": 0.00005,
+            "color": "#EC4899",
+            "description": "Gen-10 因子，冲刺 200x 目标版本",
+            "backtest_return": 12777.95,
+            "win_rate": 57.14
+        },
+        {
+            "id": "gen6_1089pct",
+            "name": "Gen-6 (1089%)",
+            "path": "/Users/zhangzc/7/20260123/0208_Gen6_1089pct/live_inference.py",
+            "threshold": 0.001,
+            "color": "#14B8A6",
+            "description": "Gen-6 突破因子，1089% 回测收益",
+            "backtest_return": 1089.0,
+            "win_rate": 65.0
+        },
+        {
+            "id": "gen4_827pct",
+            "name": "Gen-4 (827%)",
+            "path": "/Users/zhangzc/7/20260123/0208_Gen4_827pct/live_inference.py",
+            "threshold": 0.001,
+            "color": "#06B6D4",
+            "description": "Gen-4 动量因子，827% 回测收益",
+            "backtest_return": 827.0,
+            "win_rate": 62.0
+        },
+        {
+            "id": "alpha158",
+            "name": "Alpha158",
+            "path": "/Users/zhangzc/7/20260123/0208_Alpha158_Optimization/live_inference.py",
+            "threshold": 0.001,
+            "color": "#6366F1",
+            "description": "Alpha158 经典因子库优化版本",
+            "backtest_return": 500.0,
+            "win_rate": 55.0
+        },
+        {
+            "id": "qlib_ai",
+            "name": "Qlib AI Base",
+            "path": "/Users/zhangzc/7/20260123/0207_Qlib_AI/live_inference.py",
+            "threshold": 0.001,
+            "color": "#A855F7",
+            "description": "Qlib 基础 AI 模型",
+            "backtest_return": 300.0,
+            "win_rate": 52.0
+        }
+    ]
+}

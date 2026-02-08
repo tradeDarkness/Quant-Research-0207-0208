@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gen-10 EPIC 回测交易历史 | 15171x</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --profit-color: #3fb950;
+            --loss-color: #f85149;
+            --accent-color: #58a6ff;
+            --gold-color: #f0b90b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1f2e 0%, #0d1117 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 .badge {
+            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* 核心统计卡片 */
+        .core-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .core-stat {
+            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .core-stat.highlight {
+            background: linear-gradient(135deg, rgba(240, 185, 11, 0.15) 0%, rgba(240, 185, 11, 0.05) 100%);
+            border-color: var(--gold-color);
+        }
+
+        .core-stat .label {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .core-stat .value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .core-stat .sub {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .core-stat .value.profit {
+            color: var(--profit-color);
+        }
+
+        .core-stat .value.loss {
+            color: var(--loss-color);
+        }
+
+        .core-stat .value.gold {
+            color: var(--gold-color);
+        }
+
+        /* 详细统计网格 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        .stat-item {
+            background: var(--bg-tertiary);
+            padding: 14px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-item .label {
+            color: var(--text-secondary);
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .stat-item .value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .stat-item .value.profit {
+            color: var(--profit-color);
+        }
+
+        .stat-item .value.loss {
+            color: var(--loss-color);
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .controls input,
+        .controls select {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .controls input:focus,
+        .controls select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .table-container {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1200px;
+        }
+
+        th {
+            background: var(--bg-tertiary);
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            font-family: 'SF Mono', Consolas, monospace;
+        }
+
+        tr:hover td {
+            background: var(--bg-tertiary);
+        }
+
+        .direction {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 11px;
+        }
+
+        .direction.long {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--profit-color);
+        }
+
+        .direction.short {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--loss-color);
+        }
+
+        .pnl.positive {
+            color: var(--profit-color);
+        }
+
+        .pnl.negative {
+            color: var(--loss-color);
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .pagination button {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 1200px) {
+            .core-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .core-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                📊 Gen-10 EPIC 回测交易历史
+                <span class="badge">+15171x</span>
+            </h1>
+
+            <!-- 核心统计 -->
+            <div class="core-stats">
+                <div class="core-stat highlight">
+                    <div class="label">💰 总盈利（ETH 点数）</div>
+                    <div class="value gold" id="totalPoints">-</div>
+                    <div class="sub" id="totalPointsSub">假设每笔 1 ETH</div>
+                </div>
+                <div class="core-stat">
+                    <div class="label">📈 累计收益率</div>
+                    <div class="value profit" id="totalReturn">-</div>
+                    <div class="sub">复利计算</div>
+                </div>
+                <div class="core-stat">
+                    <div class="label">🎯 胜率</div>
+                    <div class="value" id="winRate">-</div>
+                    <div class="sub" id="winRateSub">-</div>
+                </div>
+                <div class="core-stat">
+                    <div class="label">⚡ 盈亏比</div>
+                    <div class="value" id="profitFactor">-</div>
+                    <div class="sub" id="profitFactorSub">平均盈利/平均亏损</div>
+                </div>
+            </div>
+
+            <!-- 详细统计 -->
+            <div class="stats-grid" id="stats">
+                <div class="stat-item">
+                    <div class="label">总交易笔数</div>
+                    <div class="value" id="totalTrades">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">盈利笔数</div>
+                    <div class="value profit" id="winTrades">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">亏损笔数</div>
+                    <div class="value loss" id="lossTrades">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">最大单笔盈利</div>
+                    <div class="value profit" id="maxWin">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">最大单笔亏损</div>
+                    <div class="value loss" id="maxLoss">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">平均盈利</div>
+                    <div class="value profit" id="avgWin">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">平均亏损</div>
+                    <div class="value loss" id="avgLoss">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">做多次数</div>
+                    <div class="value" id="longCount">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">做空次数</div>
+                    <div class="value" id="shortCount">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">做多胜率</div>
+                    <div class="value" id="longWinRate">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">做空胜率</div>
+                    <div class="value" id="shortWinRate">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">最大连续盈利</div>
+                    <div class="value profit" id="maxWinStreak">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">最大连续亏损</div>
+                    <div class="value loss" id="maxLossStreak">-</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">日均交易</div>
+                    <div class="value" id="avgDailyTrades">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <label style="color: var(--text-secondary); font-size: 13px;">时间段：</label>
+            <input type="date" id="startDate" style="width: 140px;">
+            <span style="color: var(--text-secondary);">至</span>
+            <input type="date" id="endDate" style="width: 140px;">
+            <button onclick="clearDateFilter()"
+                style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 8px 12px; border-radius: 6px; cursor: pointer;">清除</button>
+            <select id="directionFilter">
+                <option value="">全部方向</option>
+                <option value="long">做多</option>
+                <option value="short">做空</option>
+            </select>
+            <select id="resultFilter">
+                <option value="">全部结果</option>
+                <option value="profit">盈利</option>
+                <option value="loss">亏损</option>
+            </select>
+            <select id="pageSize">
+                <option value="50">每页 50 条</option>
+                <option value="100" selected>每页 100 条</option>
+                <option value="200">每页 200 条</option>
+                <option value="500">每页 500 条</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>开仓时间</th>
+                            <th>平仓时间</th>
+                            <th>方向</th>
+                            <th>开仓价</th>
+                            <th>平仓价</th>
+                            <th>盈亏点数</th>
+                            <th>收益率</th>
+                            <th>模型得分</th>
+                            <th>累计收益</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr>
+                            <td colspan="10" class="loading">加载中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <button id="prevBtn" onclick="prevPage()">上一页</button>
+                <span class="page-info" id="pageInfo">第 1 页</span>
+                <button id="nextBtn" onclick="nextPage()">下一页</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+        let priceData = {};
+        let filteredData = [];
+        let currentPage = 1;
+        let pageSize = 100;
+
+        // 加载价格数据
+        async function loadPriceData() {
+            try {
+                const response = await fetch('ETHUSDT_Swap_10m_1y.csv');
+                const text = await response.text();
+                const lines = text.trim().split('\n');
+
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',');
+                    const datetime = values[0];
+                    priceData[datetime] = {
+                        open: parseFloat(values[1]),
+                        high: parseFloat(values[2]),
+                        low: parseFloat(values[3]),
+                        close: parseFloat(values[4])
+                    };
+                }
+                console.log('Loaded price data:', Object.keys(priceData).length, 'bars');
+            } catch (error) {
+                console.error('Failed to load price data:', error);
+            }
+        }
+
+        // 加载回测数据
+        async function loadData() {
+            await loadPriceData();
+
+            try {
+                const response = await fetch('ai_backtest_results.csv');
+                const text = await response.text();
+                const lines = text.trim().split('\n');
+
+                allData = lines.slice(1).map((line, index) => {
+                    const values = line.split(',');
+                    const datetime = values[0];
+                    const strategyReturn = parseFloat(values[5]);
+                    const signal = parseInt(values[4]);
+
+                    // 获取开仓和平仓价格
+                    const openTime = new Date(datetime);
+                    const closeTime = new Date(openTime.getTime() + 10 * 60 * 1000);
+                    const closeTimeStr = closeTime.toISOString().replace('T', ' ').substring(0, 19);
+
+                    // 从价格数据获取实际价格
+                    const openPrice = priceData[datetime]?.close || 2500;
+
+                    // label 是原始价格变化（close/open - 1），不含方向
+                    const label = parseFloat(values[2]);
+
+                    // 平仓价 = 开仓价 * (1 + 原始价格变化)
+                    // 这样做空时：价格上涨 → 平仓价 > 开仓价 → 亏损
+                    const closePrice = openPrice * (1 + label);
+
+                    // 盈亏点数基于策略收益率计算（已包含方向）
+                    const pnlPoints = openPrice * strategyReturn;
+
+                    return {
+                        id: index + 1,
+                        datetime: datetime,
+                        closeTime: closeTimeStr,
+                        instrument: values[1],
+                        label: parseFloat(values[2]),
+                        pred: parseFloat(values[3]),
+                        signal: signal,
+                        strategyReturn: strategyReturn,
+                        netReturn: parseFloat(values[6]),
+                        cumRet: parseFloat(values[7]),
+                        openPrice: openPrice,
+                        closePrice: closePrice,
+                        pnlPoints: pnlPoints
+                    };
+                });
+
+                // 按时间倒序排列（最新的在前面）
+                allData.reverse();
+
+                filteredData = [...allData];
+                updateStats();
+                renderTable();
+            } catch (error) {
+                document.getElementById('tableBody').innerHTML =
+                    '<tr><td colspan="10" class="loading">加载失败: ' + error.message + '</td></tr>';
+            }
+        }
+
+        function updateStats() {
+            const wins = filteredData.filter(d => d.strategyReturn > 0);
+            const losses = filteredData.filter(d => d.strategyReturn < 0);
+            const longs = filteredData.filter(d => d.signal === 1);
+            const shorts = filteredData.filter(d => d.signal === -1);
+            const longWins = longs.filter(d => d.strategyReturn > 0);
+            const shortWins = shorts.filter(d => d.strategyReturn > 0);
+
+            // 计算总盈利点数
+            const totalPoints = filteredData.reduce((sum, d) => sum + d.pnlPoints, 0);
+
+            // 计算平均盈亏
+            const avgWin = wins.length > 0 ? wins.reduce((s, d) => s + d.strategyReturn, 0) / wins.length : 0;
+            const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, d) => s + d.strategyReturn, 0) / losses.length) : 1;
+
+            // 计算连续盈亏
+            let maxWinStreak = 0, maxLossStreak = 0;
+            let currentWin = 0, currentLoss = 0;
+            filteredData.forEach(d => {
+                if (d.strategyReturn > 0) {
+                    currentWin++;
+                    currentLoss = 0;
+                    maxWinStreak = Math.max(maxWinStreak, currentWin);
+                } else {
+                    currentLoss++;
+                    currentWin = 0;
+                    maxLossStreak = Math.max(maxLossStreak, currentLoss);
+                }
+            });
+
+            // 计算日均交易
+            const firstDate = new Date(filteredData[0]?.datetime);
+            const lastDate = new Date(filteredData[filteredData.length - 1]?.datetime);
+            const days = Math.max(1, (lastDate - firstDate) / (1000 * 60 * 60 * 24));
+            const avgDailyTrades = (filteredData.length / days).toFixed(1);
+
+            // 累计收益
+            const finalCumRet = filteredData[filteredData.length - 1]?.cumRet || 1;
+
+            // 更新核心统计
+            document.getElementById('totalPoints').textContent = totalPoints.toFixed(2) + ' 点';
+            document.getElementById('totalPointsSub').textContent = `≈ $${totalPoints.toFixed(2)} (1ETH)`;
+            document.getElementById('totalReturn').textContent = finalCumRet.toFixed(0) + 'x';
+            document.getElementById('winRate').textContent = ((wins.length / filteredData.length) * 100).toFixed(1) + '%';
+            document.getElementById('winRateSub').textContent = `${wins.length} 盈 / ${losses.length} 亏`;
+            document.getElementById('profitFactor').textContent = (avgWin / avgLoss).toFixed(2);
+            document.getElementById('profitFactorSub').textContent = `${(avgWin * 100).toFixed(3)}% / ${(avgLoss * 100).toFixed(3)}%`;
+
+            // 更新详细统计
+            document.getElementById('totalTrades').textContent = filteredData.length.toLocaleString();
+            document.getElementById('winTrades').textContent = wins.length.toLocaleString();
+            document.getElementById('lossTrades').textContent = losses.length.toLocaleString();
+
+            const maxWin = Math.max(...filteredData.map(d => d.strategyReturn));
+            const maxLoss = Math.min(...filteredData.map(d => d.strategyReturn));
+
+            document.getElementById('maxWin').textContent = '+' + (maxWin * 100).toFixed(3) + '%';
+            document.getElementById('maxLoss').textContent = (maxLoss * 100).toFixed(3) + '%';
+            document.getElementById('avgWin').textContent = '+' + (avgWin * 100).toFixed(3) + '%';
+            document.getElementById('avgLoss').textContent = '-' + (avgLoss * 100).toFixed(3) + '%';
+
+            document.getElementById('longCount').textContent = longs.length.toLocaleString();
+            document.getElementById('shortCount').textContent = shorts.length.toLocaleString();
+            document.getElementById('longWinRate').textContent = longs.length > 0 ? ((longWins.length / longs.length) * 100).toFixed(1) + '%' : '-';
+            document.getElementById('shortWinRate').textContent = shorts.length > 0 ? ((shortWins.length / shorts.length) * 100).toFixed(1) + '%' : '-';
+
+            document.getElementById('maxWinStreak').textContent = maxWinStreak + ' 次';
+            document.getElementById('maxLossStreak').textContent = maxLossStreak + ' 次';
+            document.getElementById('avgDailyTrades').textContent = avgDailyTrades + ' 笔';
+        }
+
+        function renderTable() {
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            const pageData = filteredData.slice(start, end);
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = pageData.map(row => {
+                const direction = row.signal === 1 ? 'long' : 'short';
+                const directionText = row.signal === 1 ? '🟢 做多' : '🔴 做空';
+                const pnlClass = row.strategyReturn > 0 ? 'positive' : 'negative';
+                const pnlSign = row.strategyReturn > 0 ? '+' : '';
+                const pointsSign = row.pnlPoints > 0 ? '+' : '';
+
+                return `
+                    <tr>
+                        <td>${row.id}</td>
+                        <td>${row.datetime}</td>
+                        <td>${row.closeTime}</td>
+                        <td><span class="direction ${direction}">${directionText}</span></td>
+                        <td>$${row.openPrice.toFixed(2)}</td>
+                        <td>$${row.closePrice.toFixed(2)}</td>
+                        <td class="pnl ${pnlClass}">${pointsSign}${row.pnlPoints.toFixed(2)}</td>
+                        <td class="pnl ${pnlClass}">${pnlSign}${(row.strategyReturn * 100).toFixed(4)}%</td>
+                        <td>${row.pred.toFixed(6)}</td>
+                        <td>${row.cumRet.toFixed(2)}x</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const totalPages = Math.ceil(filteredData.length / pageSize);
+            document.getElementById('pageInfo').textContent =
+                `第 ${currentPage} / ${totalPages} 页 (共 ${filteredData.length} 条)`;
+            document.getElementById('prevBtn').disabled = currentPage === 1;
+            document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+        }
+
+        function prevPage() {
+            if (currentPage > 1) { currentPage--; renderTable(); }
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(filteredData.length / pageSize);
+            if (currentPage < totalPages) { currentPage++; renderTable(); }
+        }
+
+        function applyFilters() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const direction = document.getElementById('directionFilter').value;
+            const result = document.getElementById('resultFilter').value;
+
+            filteredData = allData.filter(row => {
+                // 日期范围筛选
+                if (startDate) {
+                    const rowDate = row.datetime.split(' ')[0];
+                    if (rowDate < startDate) return false;
+                }
+                if (endDate) {
+                    const rowDate = row.datetime.split(' ')[0];
+                    if (rowDate > endDate) return false;
+                }
+                // 方向筛选
+                if (direction === 'long' && row.signal !== 1) return false;
+                if (direction === 'short' && row.signal !== -1) return false;
+                // 结果筛选
+                if (result === 'profit' && row.strategyReturn <= 0) return false;
+                if (result === 'loss' && row.strategyReturn >= 0) return false;
+                return true;
+            });
+
+            currentPage = 1;
+            updateStats();
+            renderTable();
+        }
+
+        function clearDateFilter() {
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            applyFilters();
+        }
+
+        // 事件监听
+        document.getElementById('startDate').addEventListener('change', applyFilters);
+        document.getElementById('endDate').addEventListener('change', applyFilters);
+        document.getElementById('directionFilter').addEventListener('change', applyFilters);
+        document.getElementById('resultFilter').addEventListener('change', applyFilters);
+        document.getElementById('pageSize').addEventListener('change', (e) => {
+            pageSize = parseInt(e.target.value);
+            currentPage = 1;
+            renderTable();
+        });
+
+        // 初始化
+        loadData();
+    </script>
+</body>
+
+</html>

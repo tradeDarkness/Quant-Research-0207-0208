@@ -1,0 +1,24 @@
+# System
+.DS_Store
+*.log
+__pycache__/
+*.pyc
+
+# Environments
+.venv*/
+venv/
+env/
+.env
+
+# Large Data & Binary
+*.h5
+*.bin
+*.pkl
+qlib_data/
+mlruns/
+*.csv
+!trade_history*.csv
+!*result*.csv
+
+# Dependencies
+node_modules/
