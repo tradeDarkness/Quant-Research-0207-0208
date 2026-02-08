@@ -16,8 +16,12 @@
 
 ### 2. 🔮 实盘与预测 (Live Prediction)
 - **`live_polymarket_qlib.py`** (⭐ **核心**): 实盘推理脚本。
-  - **功能**: 连接交易所 API 获取最新数据 -> 计算 Qlib 因子 -> 调用训练好的模型 -> 输出预测结果 (Up/Down)。
-  - **状态**: 已准备好，等待模型进一步优化。
+  - **功能**: 连接交易所 API 获取最新数据 -> 计算 Phase 4 高级因子 (L2 Proxy/VATB) -> 调用训练好的模型 -> 输出预测结果。
+  - **状态**: **已升级至 Phase 4 引擎**，在 0.65 阈值下具备 ~65% 的精准度。支持 `predict_next_dict()` 供 Telegram Bot 调用。
+
+### 2.1 📱 消息模块 (Telegram Bot)
+- **`telegram_bot.py`**: Telegram 机器人对接。支持 `/predict` 命令，直接输出 Phase 4 高置信度信号。
+- **信号说明**: `STRONG BULLISH` 表示触发了 Phase 4 的高精准度阈值，具备最高的历史胜率参考价值。
 
 ### 3. 🧠 模型训练 (Model Training)
 - `train_qlib_model.py`: 使用 LightGBM 训练预测模型。

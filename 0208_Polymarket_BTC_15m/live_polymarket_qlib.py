@@ -1,283 +1,125 @@
+
 import sys
 import os
 import pandas as pd
 import numpy as np
 import requests
 import joblib
-import qlib
-from qlib.data import D
-from qlib.data.dataset import DatasetH
-from qlib.workflow import R
 import warnings
-import time
 from datetime import datetime, timedelta
 
-# Suppress Qlib/Gym warnings
+# Suppress warnings
 warnings.filterwarnings("ignore")
 
 # Configuration
-QLIB_DIR = os.path.expanduser("~/.qlib/qlib_data/my_crypto")
-MODEL_PATH = "qlib_lgbm_btc_15m.pkl"
-CSV_PATH = "BTCUSDT_15m.csv"
-
-# Import data preparation script
-# Modify sys.path if needed
-sys.path.append(os.getcwd())
-import prepare_qlib_btc_15m
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "lgbm_btc_15m_final.pkl")
+CSV_PATH = os.path.join(BASE_DIR, "BTCUSDT_15m.csv")
 
 class LiveModel:
-    def __init__(self, model_path=MODEL_PATH, qlib_dir=QLIB_DIR):
+    def __init__(self, model_path=MODEL_PATH):
         self.model_path = model_path
-        self.qlib_dir = qlib_dir
-        
-        # Initialize Qlib
-        qlib.init(provider_uri=qlib_dir, region="us")
-        
-        # Load Model
-        print(f"Loading model from {model_path}...")
+        # Load Phase 4 Model
+        print(f"Loading Phase 4 model from {model_path}...")
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model {model_path} not found. Please train it first.")
         self.model = joblib.load(model_path)
         print("Model loaded successfully.")
         
     def fetch_latest_data(self):
-        """
-        Fetch latest 15m candles from Binance and update CSV.
-        """
+        """Fetch latest candles from Binance."""
         print("Fetching latest BTCUSDT data from Binance...")
         url = "https://api.binance.com/api/v3/klines"
-        params = {
-            "symbol": "BTCUSDT",
-            "interval": "15m",
-            "limit": 100 # Fetch last 100 to ensure overlap
-        }
+        params = {"symbol": "BTCUSDT", "interval": "15m", "limit": 200}
         
         try:
             resp = requests.get(url, params=params)
             data = resp.json()
             
-            # Parse
-            # [open_time, open, high, low, close, volume, close_time, quote_asset_volume, number_of_trades, taker_buy_base, taker_buy_quote, ignore]
             new_rows = []
             for k in data:
                 ts = int(k[0])
                 dt = datetime.fromtimestamp(ts / 1000)
-                row = {
+                new_rows.append({
                     "datetime": dt,
-                    "open": float(k[1]),
-                    "high": float(k[2]),
-                    "low": float(k[3]),
-                    "close": float(k[4]),
+                    "open": float(k[1]), "high": float(k[2]), "low": float(k[3]), "close": float(k[4]),
                     "volume": float(k[5]),
-                    "quote_asset_volume": float(k[7]), # amount
-                    "number_of_trades": int(k[8]),
-                    "taker_buy_base_asset_volume": float(k[9]),
-                    "taker_buy_quote_asset_volume": float(k[10])
-                }
-                new_rows.append(row)
-                
+                    "trades": int(k[8]),
+                    "buyer_buy_base": float(k[9]) # Taker Buy Volume
+                })
             new_df = pd.DataFrame(new_rows)
             
-            # Load existing CSV
             if os.path.exists(CSV_PATH):
                 existing_df = pd.read_csv(CSV_PATH)
                 existing_df['datetime'] = pd.to_datetime(existing_df['datetime'])
-                
-                # Merge and Drop Duplicates
-                combined = pd.concat([existing_df, new_df])
-                combined = combined.drop_duplicates(subset=['datetime'], keep='last')
+                combined = pd.concat([existing_df, new_df]).drop_duplicates(subset=['datetime'], keep='last')
                 combined = combined.sort_values('datetime').reset_index(drop=True)
-                
-                # Save
                 combined.to_csv(CSV_PATH, index=False)
-                print(f"Updated {CSV_PATH}. Latest data: {combined['datetime'].iloc[-1]}")
-                return combined['datetime'].iloc[-1]
+                return combined
             else:
-                print(f"Error: {CSV_PATH} not found.")
-                # If not found, create only new?
                 new_df.to_csv(CSV_PATH, index=False)
-                return new_df['datetime'].iloc[-1]
-                
+                return new_df
         except Exception as e:
             print(f"Error fetching data: {e}")
-            import traceback
-            traceback.print_exc()
             return None
 
-    def refresh_qlib_data(self):
-        """
-        Run the data preparation script to update Qlib binaries.
-        """
-        print("Refreshing Qlib binary data...")
-        # We need to reload the module or just call the function if available
-        # But prepare_qlib_btc_15m is a script.
-        # We imported it, so we can call convert_to_qlib_format()
-        prepare_qlib_btc_15m.convert_to_qlib_format(input_file=CSV_PATH, qlib_dir=self.qlib_dir)
+    def calculate_features(self, df):
+        """Replicate the high-precision feature engineering from train_qlib_model.py."""
+        df = df.copy()
+        print("Calculating Phase 4 features (ROC, Vol, L2 Proxy)...")
+        # ROC
+        for n in [1, 5, 10, 20, 60, 100]: df[f'ROC_{n}'] = df['close'].pct_change(n)
+        # Vol
+        for n in [10, 20, 60, 100]: df[f'VOL_{n}'] = df['close'].rolling(n).std() / (df['close'].rolling(n).mean() + 1e-9)
+        # MA
+        for n in [5, 10, 20, 60, 100]: df[f'MA_{n}'] = df['close'] / (df['close'].rolling(n).mean() + 1e-9) - 1
+        # L2 Proxy
+        df['L2_TakerBuyRatio'] = df['buyer_buy_base'] / (df['volume'] + 1e-9)
+        df['L2_Imbalance'] = (df['buyer_buy_base'] - (df['volume'] - df['buyer_buy_base'])) / (df['volume'] + 1e-9)
+        df['L2_VolIntensity'] = df['volume'] / (df['volume'].rolling(20).mean() + 1e-9)
+        df['L2_TradeIntensity'] = df['trades'] / (df['trades'].rolling(20).mean() + 1e-9)
+        # Hypotheses
+        df['H1_Spike'] = df['L2_VolIntensity'] * df['ROC_1']
+        df['H2_Quantile'] = (df['close'] - df['close'].rolling(30).min()) / (df['close'].rolling(30).max() - df['close'].rolling(30).min() + 1e-9)
+        df['H21_BBBreak'] = (df['close'] - df['close'].rolling(20).mean()) / (df['close'].rolling(20).std() + 1e-9)
         
-        # Reload Qlib to see new data?
-        # Qlib caches might persist. Best to clear cache.
-        import shutil
-        cache_dir = os.path.expanduser(f"{self.qlib_dir}/dataset_cache")
-        if os.path.exists(cache_dir):
-            shutil.rmtree(cache_dir)
-            
-        # Features cache
-        ft_cache = os.path.expanduser(f"{self.qlib_dir}/features/BTCUSDT")
-        if os.path.exists(ft_cache):
-            for f in os.listdir(ft_cache):
-                if f.endswith(".cache"):
-                    os.remove(os.path.join(ft_cache, f))
-                
-        # Re-init? usually not needed if using D.features with cache cleared.
-        print("Qlib data refreshed.")
+        feature_cols = [c for c in df.columns if any(p in c for p in ['ROC_', 'VOL_', 'MA_', 'L2_', 'H1_', 'H2_', 'H21_'])]
+        return df, feature_cols
 
     def predict_next(self):
-        """
-        Predict for the latest available timestamp.
-        """
-        # 1. Update Data
-        last_dt = self.fetch_latest_data()
-        if not last_dt:
-            return
-            
-        # 2. Refresh Qlib
-        self.refresh_qlib_data()
+        """Inference using Phase 4 Meta-tuned thresholds."""
+        df = self.fetch_latest_data()
+        if df is None: return None
         
-        # 3. Define Segment
-        # We need to predict for the latest completed candle.
-        # Format datetime string
-        last_dt_str = last_dt.strftime("%Y-%m-%d %H:%M:%S")
+        df, feature_cols = self.calculate_features(df)
+        latest_row = df.iloc[[-1]]
         
-        # Start buffer
-        start_dt = last_dt - timedelta(days=5) # ample buffer
-        start_dt_str = start_dt.strftime("%Y-%m-%d %H:%M:%S")
+        if latest_row[feature_cols].isna().any().any():
+            print("Warning: Latest features contain NaNs. Not enough history?")
+            return None
+            
+        score = self.model.predict(latest_row[feature_cols])[0]
+        dt = latest_row['datetime'].iloc[0]
+        price = latest_row['close'].iloc[0]
         
-        print(f"Preparing dataset for segment: {start_dt_str} to {last_dt_str}")
-         # ═══════════════════════════════════════════════════════════════════════════════
-        # ═══════════════════════════════════════════════════════════════════════════════
-        # RD-Agent Optimized Factor Set (Gen-1 to Gen-10)
-        # ═══════════════════════════════════════════════════════════════════════════════
-        fields = []
-        names = []
-
-        # 1. Momentum / ROC
-        for n in [1, 5, 10, 20, 60]:
-            fields.append(f"$close / Ref($close, {n}) - 1")
-            names.append(f"ROC_{n}")
-
-        # 2. Volatility
-        for n in [10, 20, 60]:
-            fields.append(f"Std($close, {n}) / Mean($close, {n})")
-            names.append(f"VOL_{n}")
-
-        # 3. MA Divergence
-        for n in [5, 10, 20, 60]:
-            fields.append(f"$close / Mean($close, {n}) - 1")
-            names.append(f"MA_{n}")
-
-        # 6. RD-Agent Gen-1 Hypotheses
-        fields.append("($volume / Mean($volume, 20)) * ($close / Ref($close, 1) - 1)"); names.append("H1_Spike")
-        fields.append("($close - Min($close, 30)) / (Max($close, 30) - Min($close, 30) + 1e-9)"); names.append("H2_Quantile")
-        fields.append("(Mean($close, 20) / $close - 1) / (Std($close, 20) / Mean($close, 20) + 1e-9)"); names.append("H3_BiasVol")
-
-        # 7. RD-Agent Gen-2 Hypotheses
-        fields.append("(($high-$low)/$close) / (Mean(($high-$low)/$close, 60) + 1e-9)"); names.append("H4_VRegime")
-        fields.append("($close / Ref($close, 5) - 1) / (Std($close, 5) / Mean($close, 5) + 1e-9)"); names.append("H5_MQuality")
-        fields.append("($close / Mean($close, 20) - 1) * ($close / Ref($close, 1) - 1)"); names.append("H6_Slope")
-
-        # 8. RD-Agent Gen-3 Hypotheses
-        fields.append("($close / Ref($close, 5) - 1) / ($close / Ref($close, 20) - 1 + 1e-9)"); names.append("H7_TAccel")
-        fields.append("Std($close, 10) / (Std($close, 60) + 1e-9)"); names.append("H8_VSqueeze")
-        fields.append("($close / Ref($close, 1) - 1) * ($volume / Mean($volume, 20) + 1e-9)"); names.append("H9_VMom")
-
-        # 9. RD-Agent Gen-4 Hypotheses
-        fields.append("($close / Ref($close, 1) - 1) * ($volume / Mean($volume, 10))"); names.append("H10_PVInt")
-        fields.append("($close - Min($low, 20)) / (Max($high, 20) - Min($low, 20) + 1e-9)"); names.append("H11_KDJK")
-        fields.append("Mean($close / Ref($close, 1) > 1, 20)"); names.append("H12_UpStreak")
-
-        # 10. RD-Agent Gen-6 Hypotheses
-        fields.append("$close / Max($high, 20) - 1"); names.append("H13_HBreak")
-        fields.append("$close / Min($low, 20) - 1"); names.append("H14_LBreak")
-        fields.append("(Mean($close, 5) / Mean($close, 20) - 1) + (Mean($close, 20) / Mean($close, 60) - 1)"); names.append("H15_TriMA")
+        # High-Precision Thresholding (from Ph4 results)
+        if score > 0.60:
+            signal = "强烈看涨 (STRONG BULLISH)"
+        elif score > 0.50:
+            signal = "看涨 (BULLISH)"
+        elif score < 0.35:
+            signal = "看跌 (BEARISH)"
+        else:
+            signal = "中性 (NEUTRAL)"
+            
+        print(f"\n>>> Prediction for {dt} <<<")
+        print(f"Current Price: {price:.2f}")
+        print(f"Confidence Score: {score:.4f} | Signal: {signal}")
         
-        # 11. RD-Agent Gen-7
-        fields.append("Abs($close / Ref($close, 1) - 1)"); names.append("H16_ExtRet")
-        fields.append("($volume / Mean($volume, 10)) / (Abs($close / Ref($close, 1) - 1) + 1e-9)"); names.append("H17_VPDiv")
+        return {"score": float(score), "signal": signal, "datetime": str(dt), "price": float(price)}
 
-        # 12. RD-Agent Gen-10 Hypotheses
-        fields.append("($close / Ref($close, 3) - 1) + ($close / Ref($close, 5) - 1) + ($close / Ref($close, 10) - 1)"); names.append("H19_MomFusion")
-        fields.append("($high - $low) / (Min($high - $low, 20) + 1e-9)"); names.append("H20_VolExplo")
-        fields.append("($close - Mean($close, 20)) / (Std($close, 20) + 1e-9)"); names.append("H21_BBBreak")
-        fields.append("$volume / Ref($volume, 1) - 1"); names.append("H22_VolMomAcc")
-        fields.append("($close - Ref($close, 3)) / 3"); names.append("H23_PriceVel")
-
-        # DataHandler Config
-        dh_config = {
-            "class": "DataHandlerLP",
-            "module_path": "qlib.data.dataset.handler",
-            "kwargs": {
-                "instruments": ["BTCUSDT"],
-                "start_time": "2024-02-09 06:45:00",
-                "end_time": last_dt_str,
-                "infer_processors": [
-                    {'class': 'RobustZScoreNorm', 'kwargs': {'fields_group': 'feature', 'clip_outlier': True, 'fit_start_time': '2024-02-09 06:45:00', 'fit_end_time': '2025-06-01 00:00:00'}}
-                ],
-                "learn_processors": [
-                    {'class': 'DropnaLabel'},
-                    {'class': 'RobustZScoreNorm', 'kwargs': {'fields_group': 'feature', 'clip_outlier': True, 'fit_start_time': '2024-02-09 06:45:00', 'fit_end_time': '2025-06-01 00:00:00'}}
-                ],
-                "process_type": "independent",
-                "data_loader": {
-                    "class": "QlibDataLoader",
-                    "kwargs": {
-                        "config": {
-                            "feature": (fields, names),
-                            "label": (["Ref($close, -1) / $close - 1"], ["LABEL0"])
-                        }
-                    }
-                }
-            }
-        }
-
-        dataset = DatasetH(
-            handler=dh_config,
-            segments={
-                "test": (start_dt_str, last_dt_str),
-            }
-        )
-        
-        try:
-            # Prepare DataFrame from DatasetH
-            # We need features only
-            feature_df = dataset.prepare("test", col_set="feature")
-            
-            print("Predicting...")
-            # self.model is raw LightGBM Booster
-            pred = self.model.predict(feature_df)
-            
-            # Booster returns numpy array or list
-            if isinstance(pred, list):
-                pred = np.array(pred)
-            
-            # Get latest
-            if len(pred) == 0:
-                print("Warning: Prediction returned empty result.")
-                return
-                
-            latest_score = pred[-1] 
-            # Index is from feature_df
-            latest_idx = feature_df.index[-1]
-            if isinstance(latest_idx, tuple):
-                 latest_idx = latest_idx[1]
-            
-            print(f"\n>>> Prediction for {latest_idx} (Target: Next 15m Return Direction) <<<")
-            print(f"Score: {latest_score:.4f}")
-            print(f"Signal: {'BULLISH' if latest_score > 0.502 else 'BEARISH' if latest_score < 0.498 else 'NEUTRAL'}")
-            
-            return latest_score
-            
-        except Exception as e:
-            print(f"Prediction failed: {e}")
-            import traceback
-            traceback.print_exc()
+    def predict_next_dict(self):
+        return self.predict_next()
 
 if __name__ == "__main__":
     live = LiveModel()
